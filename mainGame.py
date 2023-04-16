@@ -192,7 +192,7 @@ class NetherPlayer(pygame.sprite.Sprite):
 
 class Enemy(pygame.sprite.Sprite):
     def __init__(self,x,y,width,height):
-        self.rect=pygame.Rect(x,y,width,height)
+        self.rect=pygame.Rect(x,y+13,width,height)
         self.x_vel=3
         self.dx=0
         self.image_left=pygame.image.load("assets/zombieresize.png")
@@ -215,7 +215,7 @@ class Enemy(pygame.sprite.Sprite):
         self.attack(player,Flag)
     def draw(self,win,offset_x):
         self.rect=self.image.get_rect(topleft=(self.rect.x,self.rect.y))
-        win.blit(self.image,(self.rect.x-offset_x,HEIGHT-self.rect.bottom-13))
+        win.blit(self.image,(self.rect.x-offset_x,HEIGHT-self.rect.bottom))
     def attack(self,player,ticks):
         if abs(self.rect.x-player.rect.x)<64 and abs(self.rect.y-player.rect.y)<32 and not ticks:
             player.hp-=self.damage
