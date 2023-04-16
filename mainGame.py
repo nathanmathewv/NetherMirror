@@ -18,6 +18,7 @@ DAMAGE = 15
 MAX_HEALTH = 100
 HEALTHINCR = 35
 DURATION = 5000
+block_size = 64
 
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -65,13 +66,12 @@ class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
     ANIMATION_DELAY = 3
     GRAVITY=2
-    SPRITES = load_sprite_sheets("MainCharacters", "MaskDude", 32, 32, True)
-    def __init__(self, x, y, width, height):
+    def __init__(self, character, x, y, width, height):
         super().__init__()
         self.rect = pygame.Rect(x, y, width, height)
         self.x_vel = 0
         self.y_vel = 0
-        #self.SPRITES=load_sprite_sheets("MainCharacters",type, 32, 32, True)
+        self.SPRITES=load_sprite_sheets("MainCharacters",character, 32, 32, True)
         self.hp=100
         self.damage=15
         self.mask = None
@@ -155,8 +155,8 @@ class Player(pygame.sprite.Sprite):
         self.animation_count += 1
         self.update()
 
-    def attack(self,enemy):
-        if abs(self.rect.x-enemy.rect.x)<32 and abs(self.rect.y-enemy.rect.y)<32:
+    def attack(self,enemy,ticks):
+        if abs(self.rect.x-enemy.rect.x)<128 and abs(self.rect.y-enemy.rect.y)<32 and not ticks:
             enemy.hp-=self.damage
 
     def death(self):
@@ -174,9 +174,10 @@ class Player(pygame.sprite.Sprite):
     
 class NetherPlayer(pygame.sprite.Sprite):
     SPRITES = load_sprite_sheets("MainCharacters", "MaskDudeReflect", 32, 32, True)
-    def __init__(self,player,width,height):
+    def __init__(self,character,player,width,height):
         self.x=player.rect.x
         self.y=HEIGHT-player.rect.y-height
+        self.SPRITES=load_sprite_sheets("MainCharacters", (character+"Reflect"), 32, 32, True)
         self.rect = pygame.Rect(self.x, self.y, width, height)
         self.height=height
         self.width=width
@@ -199,35 +200,26 @@ class Enemy(pygame.sprite.Sprite):
         self.image=self.image_right
         self.direction="right"
         self.hp=40
-        self.damage=25
+        self.damage=20
     def walk(self,player,Flag):
-        if self.dx==4 and self.image==self.image_right:
-            self.image=self.image_left
-        elif self.dx==0 and self.image==self.image_left:
+        if self.dx==60 and self.image==self.image_left:
             self.image=self.image_right
-        if self.image==self.image_right:
-            self.rect.x-=20
+        elif self.dx==0 and self.image==self.image_right:
+            self.image=self.image_left
+        if self.image==self.image_left:
+            self.rect.x-=1
             self.dx+=1    
         else:
-            self.rect.x+=20
+            self.rect.x+=1
             self.dx-=1
         self.attack(player,Flag)
     def draw(self,win,offset_x):
         self.rect=self.image.get_rect(topleft=(self.rect.x,self.rect.y))
-        win.blit(self.image,(self.rect.x-offset_x,self.rect.y))
-    '''def follow(self,player):
-        if abs(self.rect.x-player.rect.x)<128 and abs(self.rect.y-player.rect.y)<128:
-            if self.rect.x < player.rect.x:
-                self.rect.x += PLAYER_VEL-2
-            elif self.rect.x > player.rect.x:
-                self.rect.x -= PLAYER_VEL-2
-            if self.rect.y < player.rect.y:
-                self.rect.y += PLAYER_VEL-2
-            elif self.rect.y > player.rect.y:
-                self.rect.y -= PLAYER_VEL-2'''
-    def attack(self,player,Flag):
-        if abs(self.rect.x-player.rect.x)<32 and abs(self.rect.y-player.rect.y)<32 and Flag:
+        win.blit(self.image,(self.rect.x-offset_x,HEIGHT-self.rect.bottom-13))
+    def attack(self,player,ticks):
+        if abs(self.rect.x-player.rect.x)<64 and abs(self.rect.y-player.rect.y)<32 and not ticks:
             player.hp-=self.damage
+            
 
 
 class Object(pygame.sprite.Sprite):
@@ -332,19 +324,25 @@ class Double_damage(Powerup):
 
 
 
-def draw(window,bg_image, player, objects, netherPlayer, zombie, offset_x, powerups):
+def draw(window,bg_image, player, objects, netherPlayer, zombies, offset_x, powerups,score):
     bg_image=pygame.transform.scale(bg_image,(WIDTH,HEIGHT))
     window.blit(bg_image, (0,0))
 
     health=pygame.Rect(20,20,player.hp*2,32)
+    health_border=pygame.Rect(20,20,MAX_HEALTH*2,32)
     pygame.draw.rect(window,(255,0,0),health,0)
-    pygame.draw.rect(window,(0,0,0),health,2)
+    pygame.draw.rect(window,(0,0,0),health_border,2)
+
+    font=pygame.font.SysFont("Palatino Linotype",32)
+    text=font.render("Score: "+str(score),False,(0,0,0))
+    window.blit(text,(20,65))
 
     for obj in objects:
         obj.draw(window, offset_x)
     for powerup in powerups:
-        powerup.draw(window, offset_x)    
-    zombie.draw(window,offset_x)
+        powerup.draw(window, offset_x)
+    for zombie in zombies:    
+        zombie.draw(window,offset_x)
     player.draw(window, offset_x)
     netherPlayer.animate(player)
     netherPlayer.draw(window,offset_x)
@@ -402,9 +400,21 @@ def handle_move(player, netherPlayer, objects):
             player.make_hit()
 
 ##edit 2 by D
+def health(x, y, block_size):
+    return Health_pack((x-1)*block_size, HEIGHT//2-y*block_size, block_size)
+def damage(x, y, block_size):
+    return Double_damage((x-1)*block_size, HEIGHT//2-y*block_size, block_size)
 
-def makepowerup(blocksize, size):
-    power_ups = [Health_pack(3*blocksize, HEIGHT//2-2*blocksize, size), Double_damage(6*blocksize, HEIGHT//2-2*blocksize, size), Double_damage(8*blocksize, HEIGHT//2-2*blocksize, size)]
+def makepowerup(s):
+    power_ups = [health(5, 4, s), 
+             health(21, 2, s),
+             health(28, 2, s),
+             health(39, 6, s),
+             health(58, 2, s),
+             damage(37,4,s),
+             damage(17,5,s),
+             damage(53,6,s)
+            ]
     return power_ups
 
 def collide_powerup(player, power_ups):
@@ -429,6 +439,28 @@ def darken(event, object, coordinates):
         pygame.mixer.Channel(2).play(sub_button_sound)
         return True
     return False
+
+def mZombie(i, j, block_size):
+    return Enemy(i*block_size,HEIGHT//2-j*block_size,32,52)   
+
+def spawnZom(s):
+    zom = [mZombie(4, 4, s),
+           mZombie(9, 8, s),
+           mZombie(16, 5, s),
+           mZombie(20, 2, s),
+           mZombie(21, 2, s),
+           mZombie(27, 2, s),
+           mZombie(29, 2, s),
+           mZombie(30, 4, s),
+           mZombie(35, 2, s),
+           mZombie(36, 2, s),
+           mZombie(42, 4, s),
+           mZombie(45, 2, s),
+           mZombie(48, 5, s),
+           mZombie(50, 2, s),
+           mZombie(57, 2, s),
+        ]
+    return zom
     
 def GUI(window):
     font=pygame.font.SysFont("Palatino Linotype",32)
@@ -451,7 +483,7 @@ def GUI(window):
     virtual_guy_dark=flip_y(pygame.image.load("assets/MainCharacters/VirtualGuyReflect/jump.png"))
     pink_man_dark=flip_y(pygame.image.load("assets/MainCharacters/PinkManReflect/jump.png"))
 
-    preference=''
+    preference='MaskDude'
     about=pygame.transform.scale(about,(60,64))
     about_dark=pygame.transform.scale(about_dark,(60,64))
     play=pygame.transform.scale(play,(60,64))
@@ -553,49 +585,49 @@ def About(window):
         pygame.display.update()
         
 def GameOver(window):
-    font=pygame.font.SysFont("Palatino Linotype",32)
+    font=pygame.font.SysFont("Palatino Linotype",80)
     text=font.render('Game Over',False,(255,255,255))
+
     wallpaper=pygame.image.load("assets/backgroundgui.jpg")
     wallpaper=pygame.transform.scale(wallpaper,(WIDTH,HEIGHT))
     window.blit(wallpaper,(0,0))
+
     textbox=text.get_rect(center=(682,284))
     window.blit(text,textbox)
     re=pygame.image.load("assets/menu/Buttons/Restart.png")
+    re=pygame.transform.scale(re,(80,80))
     re_dark=pygame.image.load("assets/menu/Buttons/Restart_dark.png")
+    re_dark=pygame.transform.scale(re_dark,(80,80))
     done=False
     while not done:
         for event in pygame.event.get():
             if event.type==pygame.QUIT:
                 pygame.quit()
             mousePos=pygame.mouse.get_pos()
-            if 682<=mousePos[0]<=742 and 570<=mousePos[1]<=634:
-                done=darken(event,re_dark,(682,570))
+            if 642<=mousePos[0]<=722 and 500<=mousePos[1]<=680:
+                done=darken(event,re_dark,(642,500))
+                if done:
+                    main(window)
             else:
-                window.blit(re,(682,570))
-
-
+                window.blit(re,(642,500))
+        pygame.display.update()
 
 def main(window):
-    Flag=False
+    score=0
     clock = pygame.time.Clock()
     bg_image=pygame.image.load("assets/background/background.png")
     type=GUI(window)
 
-    block_size = 64
-    zombie=Enemy(block_size/2+500,HEIGHT//2-block_size,32,52)
-    player = Player(block_size/2, HEIGHT//2-block_size, 50, 50)
-    netherPlayer=NetherPlayer(player,50,50)
-    fire = Fire(block_size/2, HEIGHT//2 - block_size, 32, 32)
-    fire.on()
+    zombies=spawnZom(block_size)
+    player = Player(type,block_size/2, HEIGHT//2-block_size, 50, 50)
+    netherPlayer=NetherPlayer(type,player,50,50)
+    #fire = Fire(block_size/2, HEIGHT//2 - block_size, 32, 32)
+    #fire.on()
     floor = [Block(i * block_size, (HEIGHT//2 - block_size), block_size)
-             for i in range(-block_size, (WIDTH * 2) // block_size)]
+             for i in range(-block_size, (WIDTH * 4) // block_size)]
     objects=[*floor]
-    objects.extend(makemap(objects,block_size))
-
-    zombies = []
-    power_ups = makepowerup(block_size, block_size)
-
-    #objects = makemap(objects, block_size)
+    objects=makemap(objects,block_size)
+    power_ups = makepowerup(block_size)
 
     offset_x = 0
     scroll_area_width = 2*block_size
@@ -603,7 +635,7 @@ def main(window):
     run = True
     while run:
         clock.tick(FPS)
-        Flag=not Flag
+        ticks = pygame.time.get_ticks()
         #for i in range(2,HEIGHT//block_size+1):
          #   objects.append(Block(-block_size + offset_x, HEIGHT-block_size*i, block_size))
         
@@ -618,16 +650,25 @@ def main(window):
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and player.jump_count < 2:
                     player.jump()
+        for zombie in zombies:
+            if zombie.hp<=0:
+                score+=1
+                zombies.remove(zombie)
 
         player.loop(netherPlayer,FPS)
-        fire.loop()
-        zombie.walk(player,Flag)
+        #fire.loop()
+        for zombie in zombies:
+            zombie.walk(player,ticks%FPS)
+            player.attack(zombie,ticks%FPS)
+        if player.hp<=0:
+            GameOver(window)
+        
         handle_move(player, netherPlayer, objects)
         #edit 3
         power_ups = collide_powerup(player, power_ups)
         pygame.display.update()
         #edit 3 end
-        draw(window,bg_image, player, objects, netherPlayer,zombie, offset_x, power_ups)
+        draw(window,bg_image, player, objects, netherPlayer,zombies, offset_x, power_ups,score)
         #bg_image=pygame.transform.scale(bg_image,(WIDTH,HEIGHT))
         #window.blit(bg_image, (0,0))
 
