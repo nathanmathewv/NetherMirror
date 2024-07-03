@@ -8,7 +8,7 @@ You can move left, right, jump and double jump (combo of jump).
 
 The game can be run by executing the mainGame.py file. 
 
-*Controls*
+### Controls
 
 1. *Left Arrow Key - PLAYER LEFT*
 1. *Right Arrow Key - PLAYER RIGHT*  
