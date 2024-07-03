@@ -1,4 +1,4 @@
-<a name="_ju1smeh1h2la">Nether Mirror</a>
+# NETHER MIRROR
 
 *This game was made in a 36-hour hackathon conducted in our batch for which we won first place. Our game is based on “Reflections always follow you”. It is a fairly simple game as we had problems starting off with the game.*
 
